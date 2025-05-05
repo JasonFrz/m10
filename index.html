@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demo Raytrace Sederhana - Bola Merah (Terpisah)</title>
+    <title>Demo Raytrace - Dua Bola Bertabrakan</title>
     <style>
         body {
             display: flex;
@@ -34,21 +34,30 @@
         const height = canvas.height;
 
         // Definisi Warna
-        const sphereColor = { r: 255, g: 0, b: 0, a: 255 }; // Merah
+        const sphere1Color = { r: 255, g: 0, b: 0, a: 255 }; // Merah
+        const sphere2Color = { r: 0, g: 0, b: 255, a: 255 }; // Biru
         const backgroundColor = { r: 51, g: 51, b: 51, a: 255 }; // Gelap (#333)
 
-        // Definisi Scene
-        const sphere = {
-            center: Vector3.create(0, 0, -5), // Tengah layar, agak ke dalam
-            radius: 1.5,
-            color: sphereColor
+        // Definisi Scene - Dua bola
+        const scene = {
+            spheres: [
+                {
+                    center: Vector3.create(0.5, 0, -5), // Bola pertama sedikit ke kanan
+                    radius: 1.5,
+                    color: sphere1Color
+                },
+                {
+                    center: Vector3.create(-1.0, 0.5, -4), // Bola kedua sedikit ke kiri dan atas
+                    radius: 1.2,
+                    color: sphere2Color
+                }
+            ]
         };
 
         // Definisi Kamera (diasumsikan di origin)
         const cameraOrigin = Vector3.create(0, 0, 0);
 
         // Fungsi untuk mendeteksi perpotongan Ray dengan Sphere
-        // Menggunakan Vector3 dari helper.js
         function intersectSphere(rayOrigin, rayDirection, sphere) {
             const oc = Vector3.subtract(rayOrigin, sphere.center);
             const a = Vector3.dot(rayDirection, rayDirection); // Harusnya 1 jika dinormalisasi
@@ -67,11 +76,27 @@
                  // Kita ingin perpotongan terdekat yang positif (di depan kamera)
                  // Gunakan batas kecil (epsilon, misal 0.001) untuk menghindari self-intersection
                  const epsilon = 0.001;
-                 if (t0 > epsilon) return t0; // t0 adalah yang terdekat dan valid
-                 if (t1 > epsilon) return t1; // t1 valid jika t0 tidak
+                 if (t0 > epsilon) return { t: t0, sphere: sphere }; // t0 adalah yang terdekat dan valid
+                 if (t1 > epsilon) return { t: t1, sphere: sphere }; // t1 valid jika t0 tidak
 
                  return null; // Kedua perpotongan di belakang atau terlalu dekat
             }
+        }
+
+        // Fungsi untuk mencari perpotongan terdekat dengan semua bola
+        function intersectScene(rayOrigin, rayDirection) {
+            let closestIntersection = null;
+            let closestDistance = Infinity;
+
+            for (const sphere of scene.spheres) {
+                const intersection = intersectSphere(rayOrigin, rayDirection, sphere);
+                if (intersection && intersection.t < closestDistance) {
+                    closestIntersection = intersection;
+                    closestDistance = intersection.t;
+                }
+            }
+
+            return closestIntersection;
         }
 
         // Fungsi Render Utama
@@ -91,20 +116,19 @@
                     const screenY = 1 - 2 * ndcY; // Y biasanya terbalik
 
                     // Tentukan arah ray dari kamera ke pixel di view plane (z=-1)
-                    // Menggunakan Vector3 dari helper.js
                     const rayDirection = Vector3.normalize(Vector3.create(screenX, screenY, -1));
 
-                    // Cek perpotongan
-                    const intersectionT = intersectSphere(cameraOrigin, rayDirection, sphere);
+                    // Cek perpotongan dengan semua objek dalam scene
+                    const intersection = intersectScene(cameraOrigin, rayDirection);
 
                     const pixelIndex = (y * width + x) * 4; // 4 komponen per pixel (R,G,B,A)
 
-                    if (intersectionT !== null) {
-                        // Kena bola -> warna merah
-                        data[pixelIndex]     = sphere.color.r;
-                        data[pixelIndex + 1] = sphere.color.g;
-                        data[pixelIndex + 2] = sphere.color.b;
-                        data[pixelIndex + 3] = sphere.color.a;
+                    if (intersection !== null) {
+                        // Kena bola -> gunakan warna bola tersebut
+                        data[pixelIndex]     = intersection.sphere.color.r;
+                        data[pixelIndex + 1] = intersection.sphere.color.g;
+                        data[pixelIndex + 2] = intersection.sphere.color.b;
+                        data[pixelIndex + 3] = intersection.sphere.color.a;
                     } else {
                         // Tidak kena -> warna background
                         data[pixelIndex]     = backgroundColor.r;
