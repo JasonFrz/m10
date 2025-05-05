@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Raytrace Sederhana - Bola Merah (Terpisah)</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        canvas {
+            border: 1px solid black;
+            background-color: #333; /* Latar belakang gelap untuk canvas */
+        }
+    </style>
+</head>
+<body>
+    <canvas id="raytraceCanvas" width="500" height="500"></canvas>
+
+    <!-- Muat helper script TERLEBIH DAHULU -->
+    <script src="helper.js"></script>
+
+    <!-- Script utama untuk raytracing -->
+    <script>
+        // --- Mulai: Logika Raytracing Utama ---
+        const canvas = document.getElementById('raytraceCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Definisi Warna
+        const sphereColor = { r: 255, g: 0, b: 0, a: 255 }; // Merah
+        const backgroundColor = { r: 51, g: 51, b: 51, a: 255 }; // Gelap (#333)
+
+        // Definisi Scene
+        const sphere = {
+            center: Vector3.create(0, 0, -5), // Tengah layar, agak ke dalam
+            radius: 1.5,
+            color: sphereColor
+        };
+
+        // Definisi Kamera (diasumsikan di origin)
+        const cameraOrigin = Vector3.create(0, 0, 0);
+
+        // Fungsi untuk mendeteksi perpotongan Ray dengan Sphere
+        // Menggunakan Vector3 dari helper.js
+        function intersectSphere(rayOrigin, rayDirection, sphere) {
+            const oc = Vector3.subtract(rayOrigin, sphere.center);
+            const a = Vector3.dot(rayDirection, rayDirection); // Harusnya 1 jika dinormalisasi
+            const b = 2.0 * Vector3.dot(oc, rayDirection);
+            const c = Vector3.dot(oc, oc) - sphere.radius * sphere.radius;
+            const discriminant = b * b - 4 * a * c;
+
+            if (discriminant < 0) {
+                return null; // Tidak ada perpotongan
+            } else {
+                 // Hitung t0 dan t1, jarak perpotongan
+                 const sqrtDiscriminant = Math.sqrt(discriminant);
+                 const t0 = (-b - sqrtDiscriminant) / (2.0 * a);
+                 const t1 = (-b + sqrtDiscriminant) / (2.0 * a);
+
+                 // Kita ingin perpotongan terdekat yang positif (di depan kamera)
+                 // Gunakan batas kecil (epsilon, misal 0.001) untuk menghindari self-intersection
+                 const epsilon = 0.001;
+                 if (t0 > epsilon) return t0; // t0 adalah yang terdekat dan valid
+                 if (t1 > epsilon) return t1; // t1 valid jika t0 tidak
+
+                 return null; // Kedua perpotongan di belakang atau terlalu dekat
+            }
+        }
+
+        // Fungsi Render Utama
+        function render() {
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+            const aspectRatio = width / height;
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    // Konversi koordinat pixel (x, y) ke koordinat layar (-1 to 1)
+                    const ndcX = (x + 0.5) / width;  // 0 to 1
+                    const ndcY = (y + 0.5) / height; // 0 to 1
+
+                    // Konversi ke range -1 to 1, sesuaikan aspect ratio, balik sumbu Y
+                    const screenX = (2 * ndcX - 1) * aspectRatio;
+                    const screenY = 1 - 2 * ndcY; // Y biasanya terbalik
+
+                    // Tentukan arah ray dari kamera ke pixel di view plane (z=-1)
+                    // Menggunakan Vector3 dari helper.js
+                    const rayDirection = Vector3.normalize(Vector3.create(screenX, screenY, -1));
+
+                    // Cek perpotongan
+                    const intersectionT = intersectSphere(cameraOrigin, rayDirection, sphere);
+
+                    const pixelIndex = (y * width + x) * 4; // 4 komponen per pixel (R,G,B,A)
+
+                    if (intersectionT !== null) {
+                        // Kena bola -> warna merah
+                        data[pixelIndex]     = sphere.color.r;
+                        data[pixelIndex + 1] = sphere.color.g;
+                        data[pixelIndex + 2] = sphere.color.b;
+                        data[pixelIndex + 3] = sphere.color.a;
+                    } else {
+                        // Tidak kena -> warna background
+                        data[pixelIndex]     = backgroundColor.r;
+                        data[pixelIndex + 1] = backgroundColor.g;
+                        data[pixelIndex + 2] = backgroundColor.b;
+                        data[pixelIndex + 3] = backgroundColor.a;
+                    }
+                }
+            }
+
+            // Gambar hasil ke canvas
+            ctx.putImageData(imageData, 0, 0);
+            console.log("Render selesai.");
+        }
+
+        // Jalankan render saat halaman siap
+        window.onload = render;
+        // --- Akhir: Logika Raytracing Utama ---
+    </script>
+
+</body>
+</html>
